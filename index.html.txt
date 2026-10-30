@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Atlas & Flag Explorer</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background 0.3s, color 0.3s; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 20px; min-height: 100vh; }
+        
+        header { max-width: 1200px; margin: 0 auto 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        h1 { font-size: 1.8rem; display: flex; align-items: center; gap: 10px; }
+
+        .nav-btns { display: flex; gap: 10px; }
+        button { background-color: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button:hover { background-color: var(--primary-hover); }
+
+        .controls { max-width: 1200px; margin: 0 auto 20px; display: flex; gap: 15px; flex-wrap: wrap; }
+        input, select { padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background-color: var(--card-bg); color: var(--text-color); outline: none; }
+        input { flex: 1; min-width: 200px; }
+
+        .countries-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .card { background-color: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; box-shadow: var(--shadow); cursor: pointer; }
+        .card:hover { transform: translateY(-4px); transition: transform 0.2s; }
+        .flag-box { height: 140px; background-color: #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .flag-box svg { width: 100%; height: 100%; object-fit: cover; }
+        .card-info { padding: 15px; }
+        .card-info h3 { margin-bottom: 8px; font-size: 1.2rem; }
+        .card-info p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 4px; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-content { background-color: var(--card-bg); max-width: 500px; width: 100%; border-radius: 8px; padding: 20px; position: relative; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; }
+
+        /* Quiz View */
+        .quiz-container { max-width: 600px; margin: 40px auto; background-color: var(--card-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); display: none; text-align: center; }
+        .quiz-container.active { display: block; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .option-btn { background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); }
+        .option-btn:hover { background-color: var(--primary); color: white; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🌍 World Atlas & Flag Explorer</h1>
+        <div class="nav-btns">
+            <button onclick="toggleView('atlas')">🗺️ Atlas</button>
+            <button onclick="toggleView('quiz')">🎮 Quiz Mode</button>
+            <button onclick="toggleTheme()">🌓 Theme</button>
+        </div>
+    </header>
+
+    <!-- Atlas View -->
+    <div id="atlas-view">
+        <div class="controls">
+            <input type="text" id="search" placeholder="Search by country or capital..." oninput="filterData()">
+            <select id="region-filter" onchange="filterData()">
+                <option value="All">All Regions</option>
+                <option value="Africa">Africa</option>
+                <option value="Asia">Asia</option>
+                <option value="Europe">Europe</option>
+                <option value="Americas">Americas</option>
+            </select>
+        </div>
+
+        <div class="countries-grid" id="countries-grid"></div>
+    </div>
+
+    <!-- Quiz View -->
+    <div id="quiz-view" class="quiz-container">
+        <h2>Flag & Capital Quiz</h2>
+        <p style="margin: 10px 0; color: var(--text-muted);" id="quiz-score">Score: 0</p>
+        <div id="quiz-flag" class="flag-box" style="height: 160px; margin-bottom: 15px; border-radius: 6px;"></div>
+        <h3 id="quiz-question">Which country does this flag belong to?</h3>
+        <div class="options-grid" id="quiz-options"></div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="modal" onclick="closeModal(event)">
+        <div class="modal-content" id="modal-body"></div>
+    </div>
+
+    <script>
+        // Offline Dataset
+        const countries = [
+            { name: "Algeria", capital: "Algiers", region: "Africa", pop: "44.9M", currency: "DZD", flag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="450" height="600" fill="#006633"/><rect x="450" width="450" height="600" fill="#fff"/><path d="M450 180a120 120 0 1 0 0 240 120 120 0 1 0 0-240" fill="#d21034"/><path d="M480 204a100 100 0 1 0 0 192 100 100 0 1 0 0-192" fill="#fff"/><path d="M460 300l60-19-37 51 0-63 37 51z" fill="#d21034"/></svg>` },
+            { name: "Palestine", capital: "Jerusalem", region: "Asia", pop: "5.1M", currency: "ILS", flag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600"><rect width="1200" height="200" fill="#000"/><rect y="200" width="1200" height="200" fill="#fff"/><rect y="400" width="1200" height="200" fill="#007a3d"/><path d="M0 0l400 300L0 600z" fill="#ce1126"/></svg>` },
+            { name: "Japan", capital: "Tokyo", region: "Asia", pop: "125.1M", currency: "JPY", flag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="900" height="600" fill="#fff"/><circle cx="450" cy="300" r="180" fill="#bc002d"/></svg>` },
+            { name: "France", capital: "Paris", region: "Europe", pop: "67.7M", currency: "EUR", flag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600"><rect width="300" height="600" fill="#002395"/><rect x="300" width="300" height="600" fill="#fff"/><rect x="600" width="300" height="600" fill="#ed2939"/></svg>` },
+            { name: "Germany", capital: "Berlin", region: "Europe", pop: "83.2M", currency: "EUR", flag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 3"><rect width="5" height="3" fill="#000"/><rect y="1" width="5" height="2" fill="#dd0000"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>` },
+            { name: "United States", capital: "Washington, D.C.", region: "Americas", pop: "331.9M", currency: "USD", flag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1235 650"><rect width="1235" height="650" fill="#b22234"/><path d="M0 50h1235M0 150h1235M0 250h1235M0 350h1235M0 450h1235M0 550h1235" stroke="#fff" stroke-width="50"/><rect width="494" height="350" fill="#3c3b6e"/></svg>` }
+        ];
+
+        let score = 0;
+
+        function renderGrid(data) {
+            const grid = document.getElementById('countries-grid');
+            grid.innerHTML = data.map(item => `
+                <div class="card" onclick="showModal('${item.name}')">
+                    <div class="flag-box">${item.flag}</div>
+                    <div class="card-info">
+                        <h3>${item.name}</h3>
+                        <p><strong>Capital:</strong> ${item.capital}</p>
+                        <p><strong>Region:</strong> ${item.region}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterData() {
+            const query = document.getElementById('search').value.toLowerCase();
+            const region = document.getElementById('region-filter').value;
+
+            const filtered = countries.filter(c => {
+                const matchesSearch = c.name.toLowerCase().includes(query) || c.capital.toLowerCase().includes(query);
+                const matchesRegion = region === 'All' || c.region === region;
+                return matchesSearch && matchesRegion;
+            });
+
+            renderGrid(filtered);
+        }
+
+        function showModal(countryName) {
+            const c = countries.find(item => item.name === countryName);
+            const body = document.getElementById('modal-body');
+            body.innerHTML = `
+                <span class="close-btn" onclick="closeModal(true)">&times;</span>
+                <div class="flag-box" style="height:180px; margin-bottom:15px;">${c.flag}</div>
+                <h2>${c.name}</h2>
+                <p style="margin-top:10px;"><strong>Capital:</strong> ${c.capital}</p>
+                <p><strong>Region:</strong> ${c.region}</p>
+                <p><strong>Population:</strong> ${c.pop}</p>
+                <p><strong>Currency:</strong> ${c.currency}</p>
+            `;
+            document.getElementById('modal').classList.add('active');
+        }
+
+        function closeModal(e) {
+            if (e === true || e.target.id === 'modal') {
+                document.getElementById('modal').classList.remove('active');
+            }
+        }
+
+        function toggleTheme() {
+            const current = document.body.getAttribute('data-theme');
+            document.body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+        }
+
+        function toggleView(view) {
+            document.getElementById('atlas-view').style.display = view === 'atlas' ? 'block' : 'none';
+            const quizView = document.getElementById('quiz-view');
+            if (view === 'quiz') {
+                quizView.classList.add('active');
+                nextQuizQuestion();
+            } else {
+                quizView.classList.remove('active');
+            }
+        }
+
+        function nextQuizQuestion() {
+            const correct = countries[Math.floor(Math.random() * countries.length)];
+            document.getElementById('quiz-flag').innerHTML = correct.flag;
+            
+            let options = [correct.name];
+            while(options.length < 4) {
+                let randomName = countries[Math.floor(Math.random() * countries.length)].name;
+                if(!options.includes(randomName)) options.push(randomName);
+            }
+            options.sort(() => Math.random() - 0.5);
+
+            const optionsBox = document.getElementById('quiz-options');
+            optionsBox.innerHTML = options.map(opt => `
+                <button class="option-btn" onclick="checkAnswer('${opt}', '${correct.name}')">${opt}</button>
+            `).join('');
+        }
+
+        function checkAnswer(selected, correct) {
+            if(selected === correct) {
+                alert("Correct! 🎉");
+                score += 10;
+            } else {
+                alert(`Wrong! The correct answer was ${correct}.`);
+            }
+            document.getElementById('quiz-score').innerText = `Score: ${score}`;
+            nextQuizQuestion();
+        }
+
+        // Initial Load
+        renderGrid(countries);
+    </script>
+</body>
+</html>
