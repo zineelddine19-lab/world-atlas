@@ -1,0 +1,14 @@
+# World Atlas & Flag Explorer 🌍🏳️
+A lightweight, offline-ready web application to explore countries, capitals, and flags.
+
+## 🎯 What it does
+- Instant search and filtering of over 30 countries by name, capital, or language.
+- Interactive flag and capital quiz game.
+- Dark and light theme toggle with fully responsive design.
+
+## 🚀 How to Run Locally
+1. Clone the repo: `git clone https://github.com/your-username/world-atlas-explorer.git`
+2. Open `index.html` in any web browser. No installation or server required!
+
+## 👥 Team (only me)
+- **Member :** Frontend Interface & CSS Design _ Dataset compilation & Interactive Quiz Logic.
